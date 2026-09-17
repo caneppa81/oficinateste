@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title id="tituloAba">Sistema de Orçamentos - Oficina Mecânica</title>
+    <title id="tituloAba">Sistema de Orçamentos - Oficina da Família</title>
     <!-- SDKs do Firebase (Modular v10) -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
@@ -30,7 +30,11 @@
         });
 
         function carregarConfiguracoesOficina() {
-            const nome = localStorage.getItem("oficina_nome") || "Oficina Mecânica";
+            let nome = localStorage.getItem("oficina_nome");
+            if (!nome || nome === "Oficina Mecânica") {
+                nome = "Oficina da Família";
+                localStorage.setItem("oficina_nome", nome);
+            }
             const cnpj = localStorage.getItem("oficina_cnpj") || "";
             const tel = localStorage.getItem("oficina_tel") || "";
             const end = localStorage.getItem("oficina_end") || "";
@@ -56,11 +60,15 @@
         }
 
         window.verificarLogin = function() {
-            if(document.getElementById("userInput").value === "Marcelo" && document.getElementById("senhaInput").value === "brenda123") {
+            if(document.getElementById("userInput").value === "Anderson" && document.getElementById("senhaInput").value === "1") {
                 document.getElementById("modalLogin").style.display = "none";
             } else { alert("Usuário ou senha incorretos!"); }
         }
-        window.bloquearSistema = function() { document.getElementById("modalLogin").style.display = "flex"; }
+        window.bloquearSistema = function() { 
+            document.getElementById("userInput").value = "";
+            document.getElementById("senhaInput").value = "";
+            document.getElementById("modalLogin").style.display = "flex"; 
+        }
 
         function moeda(valor) {
             return Number(valor || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -148,7 +156,7 @@
         }
 
         window.enviarWhatsApp = function() {
-            const nomeOficina = localStorage.getItem("oficina_nome") || "Oficina Mecânica";
+            const nomeOficina = localStorage.getItem("oficina_nome") || "Oficina da Família";
             const cliente = document.getElementById("cliente").value.trim();
             const telefone = document.getElementById("telefone").value.trim().replace(/\D/g, '');
             const numeroOrc = document.getElementById("numero").value;
@@ -232,43 +240,56 @@
             renderizarTabelaHistorico(filtrados);
         }
 
-        // NOVA FUNÇÃO: AGENDA DE APROVADOS
+        let listaAgendaGlobal = [];
+
         window.abrirAgendaAprovados = async function() {
             document.getElementById("modalAgenda").style.display = "block";
             const tbody = document.getElementById("tabelaAgenda");
             tbody.innerHTML = `<tr><td colspan="6" class="empty">Carregando agendamentos...</td></tr>`;
 
+            // Define a data atual no input de filtro do calendário por padrão ao abrir
+            const hoje = new Date().toISOString().split("T")[0];
+            document.getElementById("filtroDataAgenda").value = hoje;
+
             try {
                 const q = query(collection(db, "orcamentos"), orderBy("data", "asc"));
                 const snapshot = await getDocs(q);
-                let aprovados = [];
+                listaAgendaGlobal = [];
                 snapshot.forEach(docSnap => {
                     const dados = docSnap.data();
                     if(dados.status === "Aprovado") {
-                        aprovados.push(dados);
+                        listaAgendaGlobal.push(dados);
                     }
                 });
 
-                tbody.innerHTML = aprovados.length === 0 ? `<tr><td colspan="6" class="empty">Nenhum orçamento com status "Aprovado" agendado.</td></tr>` : '';
-                
-                aprovados.forEach(o => {
-                    tbody.innerHTML += `<tr>
-                        <td><strong>${o.data || 'N/I'}</strong></td>
-                        <td><span style="background: #e0f2fe; color: #0369a1; padding: 4px 8px; border-radius: 4px; font-weight: bold;">${o.horario || '08:00'}</span></td>
-                        <td>${o.cliente}</td>
-                        <td>${o.veiculo} (${o.placa || 'Sem placa'})</td>
-                        <td>${moeda(o.total)}</td>
-                        <td><button class="btn-primary" onclick="carregarOrcamentoDeAgenda('${o.numero}')">Ver Orçamento</button></td>
-                    </tr>`;
-                });
+                filtrarAgendaPorData();
             } catch(e) {
                 console.error(e);
                 tbody.innerHTML = `<tr><td colspan="6" class="empty">Erro ao carregar agenda.</td></tr>`;
             }
         }
 
+        window.filtrarAgendaPorData = function() {
+            const dataSelecionada = document.getElementById("filtroDataAgenda").value;
+            const tbody = document.getElementById("tabelaAgenda");
+            
+            const aprovadosFiltrados = listaAgendaGlobal.filter(o => o.data === dataSelecionada);
+
+            tbody.innerHTML = aprovadosFiltrados.length === 0 ? `<tr><td colspan="6" class="empty">Nenhum orçamento com status "Aprovado" agendado para esta data.</td></tr>` : '';
+            
+            aprovadosFiltrados.forEach(o => {
+                tbody.innerHTML += `<tr>
+                    <td><strong>${o.data || 'N/I'}</strong></td>
+                    <td><span style="background: #e0f2fe; color: #0369a1; padding: 4px 8px; border-radius: 4px; font-weight: bold;">${o.horario || '08:00'}</span></td>
+                    <td>${o.cliente}</td>
+                    <td>${o.veiculo} (${o.placa || 'Sem placa'})</td>
+                    <td>${moeda(o.total)}</td>
+                    <td><button class="btn-primary" onclick="carregarOrcamentoDeAgenda('${o.numero}')">Ver Orçamento</button></td>
+                </tr>`;
+            });
+        }
+
         window.carregarOrcamentoDeAgenda = async function(numero) {
-            // Garante que temos os dados globais ou busca caso venha direto
             if(listaGlobalOrcamentos.length === 0) {
                 const snapshot = await getDocs(collection(db, "orcamentos"));
                 listaGlobalOrcamentos = [];
@@ -377,8 +398,8 @@
 <header class="no-print">
     <div class="header-content">
         <div>
-            <h1 id="lblNomeOficina">Oficina Mecânica</h1>
-            <small>Sistema de Orçamentos (Firebase Cloud)</small>
+            <h1 id="lblNomeOficina">Oficina da Família</h1>
+            <small>Sistema de Orçamentos Caneppa</small>
         </div>
         <div class="actions">
             <button class="btn-agenda" onclick="abrirAgendaAprovados()">📅 Agenda de Aprovados</button>
@@ -470,7 +491,7 @@
 
     <div class="card no-print">
         <div class="actions">
-            <button class="btn-success" onclick="salvarOrcamento()">💾 Salvar na Nuvem (Firebase)</button>
+            <button class="btn-success" onclick="salvarOrcamento()">Salvar</button>
             <button class="btn-whatsapp" onclick="enviarWhatsApp()">📱 Enviar WhatsApp</button>
             <button class="btn-primary" onclick="imprimirOrcamento()">🖨️ Imprimir / PDF</button>
             <button class="btn-secondary" onclick="novoOrcamento()">🆕 Novo</button>
@@ -482,7 +503,13 @@
 <div class="modal" id="modalAgenda">
     <div class="modal-content">
         <h2>📅 Agenda de Serviços (Orçamentos Aprovados)</h2>
-        <p style="color: #666; font-size: 14px;">Estes são os veículos confirmados para atendimento nas datas e blocos de horário agendados.</p>
+        <p style="color: #666; font-size: 14px;">Selecione o dia no calendário abaixo para visualizar os atendimentos agendados:</p>
+        
+        <div class="search-box" style="max-width: 300px; margin-top: 15px;">
+            <label for="filtroDataAgenda" style="font-size: 13px; margin-bottom: 4px;">Escolha a Data:</label>
+            <input type="date" id="filtroDataAgenda" onchange="filtrarAgendaPorData()">
+        </div>
+
         <table>
             <thead>
                 <tr><th>Data</th><th>Horário (Bloco)</th><th>Cliente</th><th>Veículo (Placa)</th><th>Total</th><th>Ações</th></tr>
@@ -497,7 +524,7 @@
 <div class="modal" id="modalConfig">
     <div class="modal-content" style="max-width: 600px;">
         <h2>⚙️ Configurações da Oficina</h2>
-        <div class="form-group"><label>Nome da Oficina</label><input id="cfgNome" placeholder="Ex: Oficina Mecânica do João"></div>
+        <div class="form-group"><label>Nome da Oficina</label><input id="cfgNome" placeholder="Ex: Oficina da Família"></div>
         <div class="form-group"><label>CNPJ</label><input id="cfgCnpj" placeholder="00.000.000/0001-00"></div>
         <div class="form-group"><label>Telefone de Contato</label><input id="cfgTel" placeholder="(21) 99999-9999"></div>
         <div class="form-group"><label>Endereço Completo</label><input id="cfgEnd" placeholder="Rua Exemplo, 123 - Rio de Janeiro/RJ"></div>
@@ -529,8 +556,8 @@
 <div class="modal" id="modalLogin" style="display: flex; background: #1f2937; z-index: 9999;">
     <div class="modal-content" style="max-width: 400px; margin: auto;">
         <h2 style="text-align: center;">🔒 Acesso ao Sistema</h2>
-        <div class="form-group"><label>Usuário</label><input type="text" id="userInput"></div>
-        <div class="form-group"><label>Senha</label><input type="password" id="senhaInput"></div>
+        <div class="form-group"><label>Usuário</label><input type="text" id="userInput" placeholder="Digite seu usuário"></div>
+        <div class="form-group"><label>Senha</label><input type="password" id="senhaInput" placeholder="Digite sua senha"></div>
         <button class="btn-primary" style="width: 100%; padding: 12px; margin-top: 10px;" onclick="verificarLogin()">Entrar</button>
     </div>
 </div>
