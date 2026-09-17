@@ -1,1 +1,539 @@
 <!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title id="tituloAba">Sistema de Orçamentos - Oficina Mecânica</title>
+    <!-- SDKs do Firebase (Modular v10) -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore, collection, doc, setDoc, getDocs, deleteDoc, orderBy, query } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyApTLx5pzLH22w3VUp15I30ZXmb6qAX5mk",
+            authDomain: "teste-oficina-ed1e0.firebaseapp.com",
+            projectId: "teste-oficina-ed1e0",
+            storageBucket: "teste-oficina-ed1e0.firebasestorage.app",
+            messagingSenderId: "279272012380",
+            appId: "1:279272012380:web:9cbb1b3977cb9591510499"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        let itens = [];
+        let listaGlobalOrcamentos = [];
+
+        document.addEventListener("DOMContentLoaded", () => {
+            carregarConfiguracoesOficina();
+            novoOrcamento();
+        });
+
+        function carregarConfiguracoesOficina() {
+            const nome = localStorage.getItem("oficina_nome") || "Oficina Mecânica";
+            const cnpj = localStorage.getItem("oficina_cnpj") || "";
+            const tel = localStorage.getItem("oficina_tel") || "";
+            const end = localStorage.getItem("oficina_end") || "";
+
+            document.getElementById("lblNomeOficina").textContent = nome;
+            document.getElementById("tituloAba").textContent = "Orçamentos - " + nome;
+            
+            document.getElementById("cfgNome").value = nome;
+            document.getElementById("cfgCnpj").value = cnpj;
+            document.getElementById("cfgTel").value = tel;
+            document.getElementById("cfgEnd").value = end;
+        }
+
+        window.salvarConfiguracoes = function() {
+            localStorage.setItem("oficina_nome", document.getElementById("cfgNome").value);
+            localStorage.setItem("oficina_cnpj", document.getElementById("cfgCnpj").value);
+            localStorage.setItem("oficina_tel", document.getElementById("cfgTel").value);
+            localStorage.setItem("oficina_end", document.getElementById("cfgEnd").value);
+            
+            carregarConfiguracoesOficina();
+            fecharConfig();
+            alert("Configurações atualizadas com sucesso!");
+        }
+
+        window.verificarLogin = function() {
+            if(document.getElementById("userInput").value === "Marcelo" && document.getElementById("senhaInput").value === "brenda123") {
+                document.getElementById("modalLogin").style.display = "none";
+            } else { alert("Usuário ou senha incorretos!"); }
+        }
+        window.bloquearSistema = function() { document.getElementById("modalLogin").style.display = "flex"; }
+
+        function moeda(valor) {
+            return Number(valor || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+        }
+
+        window.novoOrcamento = function() {
+            itens = [];
+            document.getElementById("numero").value = "2026-" + Math.floor(Math.random() * 900000 + 100000);
+            document.getElementById("data").value = new Date().toISOString().split("T")[0];
+            document.getElementById("cliente").value = "";
+            document.getElementById("telefone").value = "";
+            document.getElementById("veiculo").value = "";
+            document.getElementById("placa").value = "";
+            document.getElementById("ano").value = "";
+            document.getElementById("quilometragem").value = "";
+            document.getElementById("pagamento").value = "";
+            document.getElementById("status").value = "Pendente";
+            atualizarTabela();
+        }
+
+        window.adicionarItem = function() {
+            const descricao = document.getElementById("descricao").value.trim();
+            const quantidade = Number(document.getElementById("quantidade").value);
+            const valor = Number(document.getElementById("valor").value);
+            if(!descricao || valor <= 0) return alert("Preencha a descrição e um valor válido para o item.");
+            
+            itens.push({ id: Date.now(), descricao, quantidade, valor, subtotal: quantidade * valor });
+            document.getElementById("descricao").value = "";
+            document.getElementById("quantidade").value = 1;
+            document.getElementById("valor").value = "";
+            atualizarTabela();
+        }
+
+        function atualizarTabela() {
+            const tbody = document.getElementById("listaItens");
+            tbody.innerHTML = itens.length === 0 ? `<tr><td colspan="5" class="empty">Nenhum item adicionado.</td></tr>` : '';
+            let sub = 0;
+            itens.forEach(i => {
+                sub += i.subtotal;
+                tbody.innerHTML += `<tr>
+                    <td>${i.descricao}</td>
+                    <td>${i.quantidade}</td>
+                    <td>${moeda(i.valor)}</td>
+                    <td>${moeda(i.subtotal)}</td>
+                    <td><button class="btn-danger" onclick="removerItem(${i.id})">Excluir</button></td>
+                </tr>`;
+            });
+            document.getElementById("subtotal").textContent = moeda(sub);
+            document.getElementById("total").textContent = moeda(sub);
+        }
+
+        window.removerItem = function(id) {
+            itens = itens.filter(x => x.id !== id);
+            atualizarTabela();
+        }
+
+        window.salvarOrcamento = async function() {
+            const dados = {
+                numero: document.getElementById("numero").value,
+                data: document.getElementById("data").value,
+                horario: document.getElementById("horarioAgendado").value,
+                status: document.getElementById("status").value,
+                pagamento: document.getElementById("pagamento").value,
+                cliente: document.getElementById("cliente").value.trim(),
+                telefone: document.getElementById("telefone").value.trim(),
+                veiculo: document.getElementById("veiculo").value.trim(),
+                placa: document.getElementById("placa").value.trim().toUpperCase(),
+                ano: document.getElementById("ano").value.trim(),
+                quilometragem: document.getElementById("quilometragem").value.trim(),
+                itens,
+                total: itens.reduce((acc, i) => acc + i.subtotal, 0),
+                atualizadoEm: new Date().toISOString()
+            };
+
+            if(!dados.cliente) return alert("Informe o nome do cliente.");
+            if(itens.length === 0) return alert("Adicione pelo menos um item ao orçamento.");
+
+            try {
+                await setDoc(doc(db, "orcamentos", dados.numero), dados);
+                alert("Orçamento salvo com sucesso na nuvem do Firebase!");
+            } catch(e) {
+                console.error(e);
+                alert("Erro ao salvar no Firebase.");
+            }
+        }
+
+        window.enviarWhatsApp = function() {
+            const nomeOficina = localStorage.getItem("oficina_nome") || "Oficina Mecânica";
+            const cliente = document.getElementById("cliente").value.trim();
+            const telefone = document.getElementById("telefone").value.trim().replace(/\D/g, '');
+            const numeroOrc = document.getElementById("numero").value;
+            const veiculo = document.getElementById("veiculo").value.trim();
+            const placa = document.getElementById("placa").value.trim().toUpperCase();
+            const dataAtendimento = document.getElementById("data").value;
+            const horario = document.getElementById("horarioAgendado").value;
+            
+            if(!cliente) return alert("Informe o nome do cliente para enviar o WhatsApp.");
+            if(itens.length === 0) return alert("Adicione itens ao orçamento antes de enviar.");
+
+            let textoItens = "";
+            let totalGeral = 0;
+
+            itens.forEach((i, index) => {
+                textoItens += `${index + 1}. ${i.descricao} (Qtd: ${i.quantidade}) - ${moeda(i.subtotal)}\n`;
+                totalGeral += i.subtotal;
+            });
+
+            let mensagem = `Olá *${cliente}*, tudo bem?\n`;
+            mensagem += `Aqui está o orçamento da *${nomeOficina}* referente ao seu veículo *${veiculo}* (Placa: *${placa || 'N/I'}*).\n\n`;
+            mensagem += `📋 *Orçamento Nº:* ${numeroOrc}\n`;
+            mensagem += `📅 *Agendamento:* ${dataAtendimento} às ${horario}\n\n`;
+            mensagem += `🔧 *Peças e Serviços:*\n`;
+            mensagem += `${textoItens}\n`;
+            mensagem += `💰 *TOTAL: ${moeda(totalGeral)}*\n\n`;
+            mensagem += `Aguardamos a sua aprovação para realizar o serviço! Qualquer dúvida estamos à disposição.`;
+
+            const mensagemCodificada = encodeURIComponent(mensagem);
+            const urlWhatsApp = telefone ? `https://wa.me/55${telefone}?text=${mensagemCodificada}` : `https://wa.me/?text=${mensagemCodificada}`;
+            
+            window.open(urlWhatsApp, '_blank');
+        }
+
+        window.abrirHistorico = async function() {
+            document.getElementById("modalHistorico").style.display = "block";
+            const tbody = document.getElementById("historico");
+            tbody.innerHTML = `<tr><td colspan="7" class="empty">Carregando da nuvem...</td></tr>`;
+
+            try {
+                const q = query(collection(db, "orcamentos"), orderBy("atualizadoEm", "desc"));
+                const snapshot = await getDocs(q);
+                listaGlobalOrcamentos = [];
+                snapshot.forEach(docSnap => {
+                    listaGlobalOrcamentos.push(docSnap.data());
+                });
+                renderizarTabelaHistorico(listaGlobalOrcamentos);
+            } catch(e) {
+                console.error(e);
+                tbody.innerHTML = `<tr><td colspan="7" class="empty">Erro ao carregar dados do Firebase.</td></tr>`;
+            }
+        }
+
+        function renderizarTabelaHistorico(lista) {
+            const tbody = document.getElementById("historico");
+            tbody.innerHTML = lista.length === 0 ? `<tr><td colspan="7" class="empty">Nenhum orçamento encontrado.</td></tr>` : '';
+            
+            lista.forEach(o => {
+                tbody.innerHTML += `<tr>
+                    <td>${o.numero}</td>
+                    <td>${o.data}</td>
+                    <td>${o.cliente}</td>
+                    <td>${o.veiculo} (${o.placa || ''})</td>
+                    <td>${moeda(o.total)}</td>
+                    <td>${o.status}</td>
+                    <td>
+                        <button class="btn-primary" onclick="carregarOrcamento('${o.numero}')">Abrir</button>
+                        <button class="btn-danger" onclick="excluirOrcamento('${o.numero}')">Excluir</button>
+                    </td>
+                </tr>`;
+            });
+        }
+
+        window.filtrarHistorico = function() {
+            const busca = document.getElementById("busca").value.toLowerCase();
+            const filtrados = listaGlobalOrcamentos.filter(o => 
+                (o.cliente && o.cliente.toLowerCase().includes(busca)) || 
+                (o.placa && o.placa.toLowerCase().includes(busca)) ||
+                (o.numero && o.numero.toLowerCase().includes(busca))
+            );
+            renderizarTabelaHistorico(filtrados);
+        }
+
+        // NOVA FUNÇÃO: AGENDA DE APROVADOS
+        window.abrirAgendaAprovados = async function() {
+            document.getElementById("modalAgenda").style.display = "block";
+            const tbody = document.getElementById("tabelaAgenda");
+            tbody.innerHTML = `<tr><td colspan="6" class="empty">Carregando agendamentos...</td></tr>`;
+
+            try {
+                const q = query(collection(db, "orcamentos"), orderBy("data", "asc"));
+                const snapshot = await getDocs(q);
+                let aprovados = [];
+                snapshot.forEach(docSnap => {
+                    const dados = docSnap.data();
+                    if(dados.status === "Aprovado") {
+                        aprovados.push(dados);
+                    }
+                });
+
+                tbody.innerHTML = aprovados.length === 0 ? `<tr><td colspan="6" class="empty">Nenhum orçamento com status "Aprovado" agendado.</td></tr>` : '';
+                
+                aprovados.forEach(o => {
+                    tbody.innerHTML += `<tr>
+                        <td><strong>${o.data || 'N/I'}</strong></td>
+                        <td><span style="background: #e0f2fe; color: #0369a1; padding: 4px 8px; border-radius: 4px; font-weight: bold;">${o.horario || '08:00'}</span></td>
+                        <td>${o.cliente}</td>
+                        <td>${o.veiculo} (${o.placa || 'Sem placa'})</td>
+                        <td>${moeda(o.total)}</td>
+                        <td><button class="btn-primary" onclick="carregarOrcamentoDeAgenda('${o.numero}')">Ver Orçamento</button></td>
+                    </tr>`;
+                });
+            } catch(e) {
+                console.error(e);
+                tbody.innerHTML = `<tr><td colspan="6" class="empty">Erro ao carregar agenda.</td></tr>`;
+            }
+        }
+
+        window.carregarOrcamentoDeAgenda = async function(numero) {
+            // Garante que temos os dados globais ou busca caso venha direto
+            if(listaGlobalOrcamentos.length === 0) {
+                const snapshot = await getDocs(collection(db, "orcamentos"));
+                listaGlobalOrcamentos = [];
+                snapshot.forEach(d => listaGlobalOrcamentos.push(d.data()));
+            }
+            carregarOrcamento(numero);
+            fecharAgenda();
+        }
+
+        window.carregarOrcamento = function(numero) {
+            const o = listaGlobalOrcamentos.find(x => x.numero === numero);
+            if(!o) return;
+
+            document.getElementById("numero").value = o.numero;
+            document.getElementById("data").value = o.data;
+            document.getElementById("horarioAgendado").value = o.horario || "08:00";
+            document.getElementById("status").value = o.status;
+            document.getElementById("pagamento").value = o.pagamento || "";
+            document.getElementById("cliente").value = o.cliente;
+            document.getElementById("telefone").value = o.telefone || "";
+            document.getElementById("veiculo").value = o.veiculo;
+            document.getElementById("placa").value = o.placa || "";
+            document.getElementById("ano").value = o.ano || "";
+            document.getElementById("quilometragem").value = o.quilometragem || "";
+            
+            itens = o.itens || [];
+            atualizarTabela();
+            fecharHistorico();
+            window.scrollTo({ top: 0, behavior: "smooth" });
+        }
+
+        window.excluirOrcamento = async function(numero) {
+            if(!confirm(`Deseja excluir o orçamento ${numero} da nuvem?`)) return;
+            try {
+                await deleteDoc(doc(db, "orcamentos", numero));
+                window.abrirHistorico();
+            } catch(e) {
+                alert("Erro ao excluir.");
+            }
+        }
+
+        window.abrirConfig = function() { document.getElementById("modalConfig").style.display = "block"; }
+        window.fecharConfig = function() { document.getElementById("modalConfig").style.display = "none"; }
+        window.abrirHistorico = async function() { document.getElementById("modalHistorico").style.display = "block"; carregarHistoricoDados(); }
+        
+        async function carregarHistoricoDados() {
+            const tbody = document.getElementById("historico");
+            tbody.innerHTML = `<tr><td colspan="7" class="empty">Carregando da nuvem...</td></tr>`;
+            try {
+                const q = query(collection(db, "orcamentos"), orderBy("atualizadoEm", "desc"));
+                const snapshot = await getDocs(q);
+                listaGlobalOrcamentos = [];
+                snapshot.forEach(docSnap => listaGlobalOrcamentos.push(docSnap.data()));
+                renderizarTabelaHistorico(listaGlobalOrcamentos);
+            } catch(e) {
+                tbody.innerHTML = `<tr><td colspan="7" class="empty">Erro ao carregar dados.</td></tr>`;
+            }
+        }
+
+        window.fecharHistorico = function() { document.getElementById("modalHistorico").style.display = "none"; }
+        window.fecharAgenda = function() { document.getElementById("modalAgenda").style.display = "none"; }
+        window.imprimirOrcamento = function() { window.print(); }
+    </script>
+
+    <style>
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: Arial, Helvetica, sans-serif; background: #f1f3f6; color: #333; }
+        header { background: #1f2937; color: white; padding: 18px 25px; }
+        .header-content { max-width: 1200px; margin: auto; display: flex; justify-content: space-between; align-items: center; gap: 20px; }
+        header h1 { margin: 0; font-size: 23px; }
+        header small { color: #d1d5db; }
+        .container { max-width: 1200px; margin: 25px auto; padding: 0 15px; }
+        .card { background: white; border-radius: 10px; padding: 22px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+        h2 { margin-top: 0; font-size: 20px; color: #1f2937; border-bottom: 2px solid #f3f4f6; padding-bottom: 8px; }
+        .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; }
+        .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; }
+        .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; }
+        .form-group { margin-bottom: 12px; }
+        label { display: block; font-weight: bold; margin-bottom: 6px; font-size: 14px; }
+        input, select, textarea { width: 100%; padding: 11px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; }
+        button { border: 0; border-radius: 6px; padding: 11px 16px; cursor: pointer; font-weight: bold; font-size: 14px; }
+        .btn-primary { background: #2563eb; color: white; }
+        .btn-success { background: #16a34a; color: white; }
+        .btn-danger { background: #dc2626; color: white; }
+        .btn-secondary { background: #6b7280; color: white; }
+        .btn-whatsapp { background: #25d366; color: white; }
+        .btn-config { background: #4b5563; color: white; }
+        .btn-agenda { background: #0891b2; color: white; }
+        button:hover { opacity: .88; }
+        .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 15px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { border-bottom: 1px solid #e5e7eb; padding: 10px; text-align: left; }
+        th { background: #f3f4f6; }
+        .empty { text-align: center; padding: 25px; color: #777; }
+        .total-box { margin-left: auto; max-width: 400px; margin-top: 20px; }
+        .total-line { display: flex; justify-content: space-between; padding: 7px 0; }
+        .total-final { border-top: 2px solid #111827; margin-top: 8px; padding-top: 12px; font-size: 22px; font-weight: bold; }
+        .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 1000; padding: 20px; overflow-y: auto; }
+        .modal-content { background: white; max-width: 1100px; margin: 30px auto; padding: 25px; border-radius: 10px; }
+        .search-box { margin-bottom: 15px; }
+        @media print { body { background: white; } header, .no-print, button, .modal { display: none !important; } }
+    </style>
+</head>
+<body>
+
+<header class="no-print">
+    <div class="header-content">
+        <div>
+            <h1 id="lblNomeOficina">Oficina Mecânica</h1>
+            <small>Sistema de Orçamentos (Firebase Cloud)</small>
+        </div>
+        <div class="actions">
+            <button class="btn-agenda" onclick="abrirAgendaAprovados()">📅 Agenda de Aprovados</button>
+            <button class="btn-config" onclick="abrirConfig()">⚙️ Configurações</button>
+            <button class="btn-primary" onclick="novoOrcamento()">+ Novo</button>
+            <button class="btn-secondary" onclick="abrirHistorico()">📋 Histórico</button>
+            <button class="btn-danger" onclick="bloquearSistema()">🔒 Sair</button>
+        </div>
+    </div>
+</header>
+
+<div class="container">
+    <div class="card">
+        <h2>📑 Dados do Orçamento e Agenda</h2>
+        <div class="grid-3">
+            <div class="form-group"><label>Número do Orçamento</label><input id="numero" readonly></div>
+            <div class="form-group"><label>Data do Atendimento</label><input id="data" type="date"></div>
+            <div class="form-group">
+                <label>Agenda (Blocos de 2h)</label>
+                <select id="horarioAgendado">
+                    <option value="08:00">08:00 às 10:00</option>
+                    <option value="10:00">10:00 às 12:00</option>
+                    <option value="13:00">13:00 às 15:00</option>
+                    <option value="15:00">15:00 às 17:00</option>
+                    <option value="17:00">17:00 às 19:00</option>
+                </select>
+            </div>
+        </div>
+        <div class="grid">
+            <div class="form-group">
+                <label>Status</label>
+                <select id="status">
+                    <option value="Pendente">Pendente</option>
+                    <option value="Aprovado">Aprovado</option>
+                    <option value="Recusado">Recusado</option>
+                    <option value="Concluído">Concluído</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Forma de Pagamento</label>
+                <select id="pagamento">
+                    <option value="">Selecione</option>
+                    <option>Dinheiro</option>
+                    <option>PIX</option>
+                    <option>Cartão de Débito</option>
+                    <option>Cartão de Crédito</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>👤 Cadastro do Cliente e Veículo</h2>
+        <div class="grid">
+            <div class="form-group"><label>Nome do Cliente</label><input id="cliente" placeholder="Nome completo"></div>
+            <div class="form-group"><label>Telefone / WhatsApp</label><input id="telefone" placeholder="(21) 99999-9999"></div>
+        </div>
+        <div class="grid-4">
+            <div class="form-group"><label>Veículo</label><input id="veiculo" placeholder="Ex.: Jeep Renegade"></div>
+            <div class="form-group"><label>Placa</label><input id="placa" placeholder="ABC1D23"></div>
+            <div class="form-group"><label>Ano</label><input id="ano" placeholder="2020"></div>
+            <div class="form-group"><label>Quilometragem (KM)</label><input id="quilometragem" placeholder="Ex: 45.000"></div>
+        </div>
+    </div>
+
+    <div class="card no-print">
+        <h2>🔧 Adicionar Peças e Serviços</h2>
+        <div class="grid-3">
+            <div class="form-group"><label>Descrição</label><input id="descricao" placeholder="Ex.: Troca de óleo e filtro"></div>
+            <div class="form-group"><label>Quantidade</label><input id="quantidade" type="number" min="1" value="1"></div>
+            <div class="form-group"><label>Valor Unitário (R$)</label><input id="valor" type="number" min="0" step="0.01" placeholder="0,00"></div>
+        </div>
+        <button class="btn-success" onclick="adicionarItem()">+ Adicionar Item</button>
+    </div>
+
+    <div class="card">
+        <h2>📋 Itens do Orçamento</h2>
+        <table>
+            <thead>
+                <tr><th>Descrição</th><th>Qtd.</th><th>Unitário</th><th>Subtotal</th><th class="no-print">Ações</th></tr>
+            </thead>
+            <tbody id="listaItens"></tbody>
+        </table>
+        <div class="total-box">
+            <div class="total-line"><span>Subtotal:</span><strong id="subtotal">R$ 0,00</strong></div>
+            <div class="total-line total-final"><span>TOTAL:</span><span id="total">R$ 0,00</span></div>
+        </div>
+    </div>
+
+    <div class="card no-print">
+        <div class="actions">
+            <button class="btn-success" onclick="salvarOrcamento()">💾 Salvar na Nuvem (Firebase)</button>
+            <button class="btn-whatsapp" onclick="enviarWhatsApp()">📱 Enviar WhatsApp</button>
+            <button class="btn-primary" onclick="imprimirOrcamento()">🖨️ Imprimir / PDF</button>
+            <button class="btn-secondary" onclick="novoOrcamento()">🆕 Novo</button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL AGENDA DE APROVADOS -->
+<div class="modal" id="modalAgenda">
+    <div class="modal-content">
+        <h2>📅 Agenda de Serviços (Orçamentos Aprovados)</h2>
+        <p style="color: #666; font-size: 14px;">Estes são os veículos confirmados para atendimento nas datas e blocos de horário agendados.</p>
+        <table>
+            <thead>
+                <tr><th>Data</th><th>Horário (Bloco)</th><th>Cliente</th><th>Veículo (Placa)</th><th>Total</th><th>Ações</th></tr>
+            </thead>
+            <tbody id="tabelaAgenda"></tbody>
+        </table>
+        <button class="btn-secondary" onclick="fecharAgenda()" style="margin-top:15px;">Fechar</button>
+    </div>
+</div>
+
+<!-- MODAL CONFIGURAÇÕES -->
+<div class="modal" id="modalConfig">
+    <div class="modal-content" style="max-width: 600px;">
+        <h2>⚙️ Configurações da Oficina</h2>
+        <div class="form-group"><label>Nome da Oficina</label><input id="cfgNome" placeholder="Ex: Oficina Mecânica do João"></div>
+        <div class="form-group"><label>CNPJ</label><input id="cfgCnpj" placeholder="00.000.000/0001-00"></div>
+        <div class="form-group"><label>Telefone de Contato</label><input id="cfgTel" placeholder="(21) 99999-9999"></div>
+        <div class="form-group"><label>Endereço Completo</label><input id="cfgEnd" placeholder="Rua Exemplo, 123 - Rio de Janeiro/RJ"></div>
+        <div class="actions" style="margin-top: 20px;">
+            <button class="btn-success" onclick="salvarConfiguracoes()">Salvar Configurações</button>
+            <button class="btn-secondary" onclick="fecharConfig()">Cancelar</button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL HISTÓRICO -->
+<div class="modal" id="modalHistorico">
+    <div class="modal-content">
+        <h2>📋 Histórico de Orçamentos na Nuvem</h2>
+        <div class="search-box">
+            <input id="busca" placeholder="Pesquisar por cliente, placa ou número..." oninput="filtrarHistorico()">
+        </div>
+        <table>
+            <thead>
+                <tr><th>Número</th><th>Data</th><th>Cliente</th><th>Veículo</th><th>Total</th><th>Status</th><th>Ações</th></tr>
+            </thead>
+            <tbody id="historico"></tbody>
+        </table>
+        <button class="btn-secondary" onclick="fecharHistorico()" style="margin-top:15px;">Fechar</button>
+    </div>
+</div>
+
+<!-- MODAL LOGIN -->
+<div class="modal" id="modalLogin" style="display: flex; background: #1f2937; z-index: 9999;">
+    <div class="modal-content" style="max-width: 400px; margin: auto;">
+        <h2 style="text-align: center;">🔒 Acesso ao Sistema</h2>
+        <div class="form-group"><label>Usuário</label><input type="text" id="userInput"></div>
+        <div class="form-group"><label>Senha</label><input type="password" id="senhaInput"></div>
+        <button class="btn-primary" style="width: 100%; padding: 12px; margin-top: 10px;" onclick="verificarLogin()">Entrar</button>
+    </div>
+</div>
+
+</body>
+</html>
