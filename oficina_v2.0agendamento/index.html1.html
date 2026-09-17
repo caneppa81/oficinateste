@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <title>Sistema de Orçamentos - Oficina Mecânica</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: Arial, Helvetica, sans-serif; background: #f1f3f6; color: #333; }
+        header { background: #1f2937; color: white; padding: 18px 25px; }
+        .header-content { max-width: 1200px; margin: auto; display: flex; justify-content: space-between; align-items: center; gap: 20px; }
+        header h1 { margin: 0; font-size: 23px; }
+        header small { color: #d1d5db; }
+        .container { max-width: 1200px; margin: 25px auto; padding: 0 15px; }
+        .card { background: white; border-radius: 10px; padding: 22px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+        h2 { margin-top: 0; font-size: 20px; color: #1f2937; }
+        h3 { margin-top: 15px; font-size: 16px; color: #1f2937; }
+        .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; }
+        .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; }
+        .form-group { margin-bottom: 12px; }
+        label { display: block; font-weight: bold; margin-bottom: 6px; font-size: 14px; }
+        input, select, textarea { width: 100%; padding: 11px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; }
+        textarea { min-height: 80px; resize: vertical; }
+        input:focus, select:focus, textarea:focus { outline: none; border-color: #2563eb; }
+        button { border: 0; border-radius: 6px; padding: 11px 16px; cursor: pointer; font-weight: bold; font-size: 14px; }
+        .btn-primary { background: #2563eb; color: white; }
+        .btn-success { background: #16a34a; color: white; }
+        .btn-danger { background: #dc2626; color: white; }
+        .btn-warning { background: #d97706; color: white; }
+        .btn-secondary { background: #6b7280; color: white; }
+        .btn-info { background: #0891b2; color: white; }
+        .btn-whatsapp { background: #25d366; color: white; }
+        button:hover { opacity: .88; }
+        .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 15px; }
+        .table-responsive { width: 100%; overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { border-bottom: 1px solid #e5e7eb; padding: 10px; text-align: left; }
+        th { background: #f3f4f6; }
+        .empty { text-align: center; padding: 25px; color: #777; }
+        .total-box { margin-left: auto; max-width: 400px; margin-top: 20px; }
+        .total-line { display: flex; justify-content: space-between; padding: 7px 0; }
+        .total-final { border-top: 2px solid #111827; margin-top: 8px; padding-top: 12px; font-size: 22px; font-weight: bold; }
+        .status { padding: 6px 10px; border-radius: 20px; font-size: 12px; font-weight: bold; display: inline-block; }
+        .status-pendente { background: #fef3c7; color: #92400e; }
+        .status-aprovado { background: #dcfce7; color: #166534; }
+        .status-recusado { background: #fee2e2; color: #991b1b; }
+        .status-concluido { background: #dbeafe; color: #1e40af; }
+        .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 1000; padding: 20px; overflow-y: auto; }
+        .modal-content { background: white; max-width: 1100px; margin: 30px auto; padding: 25px; border-radius: 10px; }
+        .search-box { display: grid; grid-template-columns: 1fr 180px; gap: 10px; margin-bottom: 15px; }
+        .item-actions button { padding: 6px 9px; font-size: 12px; }
+        .agenda-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
+        .calendar-header-day { text-align: center; font-weight: bold; padding: 8px; background: #f3f4f6; border-radius: 4px; font-size: 13px; }
+        .calendar-day { min-height: 75px; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 6px; padding: 6px; cursor: pointer; position: relative; font-size: 13px; }
+        .calendar-day:hover { background: #f3f4f6; }
+        .calendar-day.other-month { opacity: 0.35; }
+        .calendar-day.has-approved { background: #dcfce7; border-color: #86efac; }
+        .calendar-day.selected { border-color: #2563eb; border-width: 2px; }
+        .badge-aprovado-count { position: absolute; bottom: 6px; right: 6px; background: #166534; color: white; border-radius: 10px; padding: 2px 6px; font-size: 10px; font-weight: bold; }
+        footer { text-align: center; padding: 25px; color: #777; }
+        @media (max-width: 800px) {
+            .grid, .grid-3 { grid-template-columns: 1fr; }
+            .header-content { flex-direction: column; align-items: flex-start; }
+            .search-box { grid-template-columns: 1fr; }
+        }
+        @media print {
+            body { background: white; }
+            header, .no-print, button, .modal, footer { display: none !important; }
+            .container { max-width: 100%; margin: 0; }
+            .card { box-shadow: none; padding: 0; }
+        }
+    </style>
+</head>
+<body>
+
+<header class="no-print">
+    <div class="header-content">
+        <div>
+            <h1 id="tituloSistema">Oficina Mecânica</h1>
+            <small>Sistema de Orçamentos</small>
+        </div>
+        <div class="actions">
+            <button class="btn-primary" onclick="novoOrcamento()">+ Novo Orçamento</button>
+            <button class="btn-secondary" onclick="abrirHistorico()">📋 Orçamentos</button>
+            <button class="btn-success" onclick="abrirAgenda()">📅 Agenda (2h)</button>
+            <button class="btn-info" onclick="abrirConfiguracoes()">⚙ Oficina</button>
+            <button class="btn-danger" onclick="bloquearSistema()">🔒 Sair</button>
+        </div>
+    </div>
+</header>
+
+<div class="container">
+    <div class="card">
+        <div class="grid-3">
+            <div class="form-group">
+                <label>Número do Orçamento</label>
+                <input id="numero" readonly>
+            </div>
+            <div class="form-group">
+                <label>Data</label>
+                <input id="data" type="date">
+            </div>
+            <div class="form-group">
+                <label>Horário (Bloco de 2h)</label>
+                <select id="horarioAgendado">
+                    <option value="08:00">08:00 às 10:00</option>
+                    <option value="10:00">10:00 às 12:00</option>
+                    <option value="13:00">13:00 às 15:00</option>
+                    <option value="15:00">15:00 às 17:00</option>
+                    <option value="17:00">17:00 às 19:00</option>
+                </select>
+            </div>
+        </div>
+        <div class="grid">
+            <div class="form-group">
+                <label>Status</label>
+                <select id="status">
+                    <option value="Pendente">Pendente</option>
+                    <option value="Aprovado">Aprovado</option>
+                    <option value="Recusado">Recusado</option>
+                    <option value="Concluído">Concluído</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Forma de Pagamento</label>
+                <select id="pagamento">
+                    <option value="">Selecione</option>
+                    <option>Dinheiro</option>
+                    <option>PIX</option>
+                    <option>Cartão de Débito</option>
+                    <option>Cartão de Crédito</option>
+                    <option>Transferência</option>
+                    <option>Boleto</option>
+                    <option>A combinar</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>👤 Cliente e Veículo</h2>
+        <div class="grid">
+            <div class="form-group">
+                <label>Nome do Cliente</label>
+                <input id="cliente" placeholder="Nome completo">
+            </div>
+            <div class="form-group">
+                <label>Telefone (WhatsApp)</label>
+                <input id="telefone" placeholder="(21) 99999-9999">
+            </div>
+        </div>
+        <div class="grid-3">
+            <div class="form-group">
+                <label>Veículo</label>
+                <input id="veiculo" placeholder="Ex.: Jeep Renegade">
+            </div>
+            <div class="form-group">
+                <label>Placa</label>
+                <input id="placa" placeholder="ABC1D23">
+            </div>
+            <div class="form-group">
+                <label>Ano</label>
+                <input id="ano" placeholder="2020">
+            </div>
+        </div>
+        <div class="grid-3">
+            <div class="form-group">
+                <label>Quilometragem</label>
+                <input id="km" type="number" placeholder="Ex.: 85000">
+            </div>
+            <div class="form-group">
+                <label>Modelo/Motor</label>
+                <input id="motor" placeholder="Ex.: 1.8 Flex">
+            </div>
+            <div class="form-group">
+                <label>Cor</label>
+                <input id="cor" placeholder="Ex.: Preto">
+            </div>
+        </div>
+    </div>
+
+    <div class="card no-print">
+        <h2>🔧 Peças e Serviços</h2>
+        <div class="grid-3">
+            <div class="form-group">
+                <label>Descrição</label>
+                <input id="descricao" placeholder="Ex.: Troca de óleo">
+            </div>
+            <div class="form-group">
+                <label>Quantidade</label>
+                <input id="quantidade" type="number" min="1" value="1">
+            </div>
+            <div class="form-group">
+                <label>Valor Unitário</label>
+                <input id="valor" type="number" min="0" step="0.01" placeholder="0,00">
+            </div>
+        </div>
+        <button class="btn-success" onclick="adicionarItem()">+ Adicionar Item</button>
+    </div>
+
+    <div class="card">
+        <h2>📋 Itens do Orçamento</h2>
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Descrição</th>
+                        <th>Qtd.</th>
+                        <th>Unitário</th>
+                        <th>Subtotal</th>
+                        <th class="no-print">Ações</th>
+                    </tr>
+                </thead>
+                <tbody id="listaItens"></tbody>
+            </table>
+        </div>
+        <div class="total-box">
+            <div class="total-line">
+                <span>Subtotal:</span>
+                <strong id="subtotal">R$ 0,00</strong>
+            </div>
+            <div class="grid no-print">
+                <div class="form-group">
+                    <label>Desconto (%)</label>
+                    <input id="descontoPercentual" type="number" min="0" max="100" value="0" oninput="calcularTotal()">
+                </div>
+                <div class="form-group">
+                    <label>Desconto (R$)</label>
+                    <input id="descontoValor" type="number" min="0" step="0.01" value="0" oninput="calcularTotal()">
+                </div>
+            </div>
+            <div class="total-line">
+                <span>Desconto:</span>
+                <strong id="descontoTotal">R$ 0,00</strong>
+            </div>
+            <div class="total-line total-final">
+                <span>TOTAL:</span>
+                <span id="total">R$ 0,00</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>📝 Observações</h2>
+        <textarea id="observacoes" placeholder="Informe observações, condições do serviço, garantia, prazo de entrega etc."></textarea>
+    </div>
+
+    <div class="card no-print">
+        <div class="actions">
+            <button class="btn-success" onclick="salvarOrcamento()">💾 Salvar Orçamento</button>
+            <button class="btn-whatsapp" onclick="enviarWhatsApp()">📱 Enviar WhatsApp</button>
+            <button class="btn-primary" onclick="imprimirOrcamento()">🖨️ Imprimir / PDF</button>
+            <button class="btn-secondary" onclick="novoOrcamento()">🆕 Novo</button>
+            <button class="btn-danger" onclick="limparTela()">🗑️ Limpar</button>
+        </div>
+    </div>
+</div>
+
+<footer class="no-print">
+    Sistema de Orçamentos - Oficina Mecânica
+</footer>
+
+<!-- MODAL HISTÓRICO -->
+<div class="modal" id="modalHistorico">
+    <div class="modal-content">
+        <h2>📋 Histórico de Orçamentos</h2>
+        <div class="search-box">
+            <input id="busca" placeholder="Pesquisar por cliente, placa ou número..." oninput="listarOrcamentos()">
+            <select id="filtroStatus" onchange="listarOrcamentos()">
+                <option value="">Todos os status</option>
+                <option>Pendente</option>
+                <option>Aprovado</option>
+                <option>Recusado</option>
+                <option>Concluído</option>
+            </select>
+        </div>
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Número</th>
+                        <th>Data / Horário</th>
+                        <th>Cliente</th>
+                        <th>Veículo</th>
+                        <th>Placa</th>
+                        <th>Total</th>
+                        <th>Status</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody id="historico"></tbody>
+            </table>
+        </div>
+        <div class="actions">
+            <button class="btn-secondary" onclick="fecharHistorico()">Fechar</button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL AGENDA DE APROVADOS -->
+<div class="modal" id="modalAgenda">
+    <div class="modal-content">
+        <h2>📅 Agenda de Serviços (Blocos de 2h)</h2>
+        <div class="agenda-header">
+            <button class="btn-secondary" onclick="mudarMes(-1)">◀ Mês Anterior</button>
+            <h3 id="mesAnoAtual" style="margin: 0;">Mês Ano</h3>
+            <button class="btn-secondary" onclick="mudarMes(1)">Próximo Mês ▶</button>
+        </div>
+        <div class="calendar-grid" id="calendarioGrid"></div>
+        <div style="margin-top: 20px;">
+            <h3>Agendamentos de 2h no Dia Selecionado (<span id="dataSelecionadaTexto">-</span>)</h3>
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Horário</th>
+                            <th>Número</th>
+                            <th>Cliente</th>
+                            <th>Veículo</th>
+                            <th>Placa</th>
+                            <th>Total</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="listaAgendaDia">
+                        <tr><td colspan="7" class="empty">Selecione um dia no calendário.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="actions" style="margin-top: 20px;">
+            <button class="btn-secondary" onclick="fecharAgenda()">Fechar</button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL CONFIGURAÇÕES -->
+<div class="modal" id="modalConfig">
+    <div class="modal-content">
+        <h2>⚙ Dados da Oficina e Acesso</h2>
+        <div class="grid">
+            <div class="form-group">
+                <label>Nome da Oficina</label>
+                <input id="oficinaNome">
+            </div>
+            <div class="form-group">
+                <label>Telefone</label>
+                <input id="oficinaTelefone">
+            </div>
+        </div>
+        <div class="grid">
+            <div class="form-group">
+                <label>CNPJ</label>
+                <input id="oficinaCnpj">
+            </div>
+            <div class="form-group">
+                <label>E-mail Gmail (Oficina)</label>
+                <input id="oficinaEmail" type="email" placeholder="exemplo@gmail.com">
+            </div>
+        </div>
+        <div class="form-group">
+            <label>Endereço</label>
+            <input id="oficinaEndereco">
+        </div>
+        <hr style="margin: 20px 0; border: 0; border-top: 1px solid #e5e7eb;">
+        <h3>🔑 Alterar Credenciais de Acesso</h3>
+        <div class="grid">
+            <div class="form-group">
+                <label>Novo Usuário</label>
+                <input id="oficinaNovoUsuario" placeholder="Digite para alterar usuário">
+            </div>
+            <div class="form-group">
+                <label>Nova Senha</label>
+                <input type="password" id="oficinaNovaSenha" placeholder="Digite para alterar senha">
+            </div>
+        </div>
+        <div class="actions">
+            <button class="btn-success" onclick="salvarConfiguracoes()">Salvar</button>
+            <button class="btn-secondary" onclick="fecharConfiguracoes()">Cancelar</button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL LOGIN -->
+<div class="modal" id="modalLogin" style="display: flex; background: #1f2937; z-index: 9999;">
+    <div class="modal-content" style="max-width: 400px; margin: auto;">
+        <h2 style="text-align: center;">🔒 Acesso ao Sistema</h2>
+        <div class="form-group">
+            <label>Usuário</label>
+            <input type="text" id="userInput" placeholder="Seu usuário...">
+        </div>
+        <div class="form-group">
+            <label>Senha</label>
+            <input type="password" id="senhaInput" placeholder="Sua senha...">
+        </div>
+        <button class="btn-primary" style="width: 100%; padding: 12px; margin-top: 10px;" onclick="verificarLogin()">Entrar</button>
+    </div>
+</div>
+
+<script>
+const CHAVE_ORCAMENTOS = "oficina_orcamentos_v3";
+const CHAVE_CONFIG = "oficina_config_v3";
+const CHAVE_USUARIO = "oficina_usuario_v1";
+const CHAVE_SENHA = "oficina_senha_v1";
+
+const USUARIO_PADRAO = "Marcelo";
+const SENHA_PADRAO = "brenda123";
+
+let itens = [];
+let orcamentoAtual = null;
+let dataAgendaAtual = new Date();
+let diaSelecionadoAgenda = null;
+
+document.addEventListener("DOMContentLoaded", () => {
+    const config = obterConfiguracoes();
+    if (config.nome) {
+        document.getElementById("tituloSistema").textContent = config.nome;
+    }
+    novoOrcamento();
+    bloquearSistema();
+
+    document.getElementById("senhaInput")?.addEventListener("keypress", (e) => {
+        if (e.key === "Enter") verificarLogin();
+    });
+    document.getElementById("userInput")?.addEventListener("keypress", (e) => {
+        if (e.key === "Enter") verificarLogin();
+    });
+});
+
+function obterUsuarioSalvo() { return localStorage.getItem(CHAVE_USUARIO) || USUARIO_PADRAO; }
+function obterSenhaSalva() { return localStorage.getItem(CHAVE_SENHA) || SENHA_PADRAO; }
+
+function verificarLogin() {
+    const userDigitado = document.getElementById("userInput").value.trim();
+    const senhaDigitada = document.getElementById("senhaInput").value.trim();
+
+    if (userDigitado.toLowerCase() === obterUsuarioSalvo().toLowerCase() && senhaDigitada === obterSenhaSalva()) {
+        document.getElementById("modalLogin").style.display = "none";
+        document.getElementById("userInput").value = "";
+        document.getElementById("senhaInput").value = "";
+    } else {
+        alert("Usuário ou senha incorretos!");
+    }
+}
+
+function bloquearSistema() { document.getElementById("modalLogin").style.display = "flex"; }
+
+function escapeHtml(texto) {
+    if (!texto) return "";
+    return String(texto).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+}
+
+function formatarData(dataIso) {
+    if (!dataIso) return "";
+    const partes = dataIso.split("-");
+    if (partes.length !== 3) return dataIso;
+    return `${partes[2]}/${partes[1]}/${partes[0]}`;
+}
+
+function moeda(valor) {
+    return Number(valor || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+function hoje() { return new Date().toISOString().split("T")[0]; }
+
+function gerarNumero() {
+    const ano = new Date().getFullYear();
+    const numero = String(Math.floor(Math.random() * 900000) + 100000);
+    return `${ano}-${numero}`;
+}
+
+function obterOrcamentos() { return JSON.parse(localStorage.getItem(CHAVE_ORCAMENTOS) || "[]"); }
+function salvarLista(lista) { localStorage.setItem(CHAVE_ORCAMENTOS, JSON.stringify(lista)); }
+function obterConfiguracoes() { return JSON.parse(localStorage.getItem(CHAVE_CONFIG) || "{}"); }
+
+function novoOrcamento() {
+    if (itens.length > 0 && !confirm("Deseja iniciar um novo orçamento?")) return;
+    limparTela();
+    document.getElementById("numero").value = gerarNumero();
+    document.getElementById("data").value = hoje();
+    document.getElementById("horarioAgendado").value = "08:00";
+}
+
+function limparTela() {
+    orcamentoAtual = null;
+    itens = [];
+    document.getElementById("numero").value = "";
+    document.getElementById("data").value = "";
+    document.getElementById("horarioAgendado").value = "08:00";
+    document.getElementById("status").value = "Pendente";
+    document.getElementById("pagamento").value = "";
+    document.getElementById("cliente").value = "";
+    document.getElementById("telefone").value = "";
+    document.getElementById("veiculo").value = "";
+    document.getElementById("placa").value = "";
+    document.getElementById("ano").value = "";
+    document.getElementById("km").value = "";
+    document.getElementById("motor").value = "";
+    document.getElementById("cor").value = "";
+    document.getElementById("descricao").value = "";
+    document.getElementById("quantidade").value = 1;
+    document.getElementById("valor").value = "";
+    document.getElementById("descontoPercentual").value = 0;
+    document.getElementById("descontoValor").value = 0;
+    document.getElementById("observacoes").value = "";
+    atualizarTabela();
+}
+
+function adicionarItem() {
+    const descricao = document.getElementById("descricao").value.trim();
+    const quantidade = Number(document.getElementById("quantidade").value);
+    const valor = Number(document.getElementById("valor").value);
+
+    if (!descricao) return alert("Informe a descrição do item.");
+    if (!quantidade || quantidade <= 0) return alert("Informe uma quantidade válida.");
+    if (valor < 0 || isNaN(valor)) return alert("Informe um valor válido.");
+
+    itens.push({ id: Date.now(), descricao, quantidade, valor, subtotal: quantidade * valor });
+    document.getElementById("descricao").value = "";
+    document.getElementById("quantidade").value = 1;
+    document.getElementById("valor").value = "";
+    atualizarTabela();
+}
+
+function removerItem(id) {
+    itens = itens.filter(item => item.id !== id);
+    atualizarTabela();
+}
+
+function editarItem(id) {
+    const item = itens.find(i => i.id === id);
+    if (!item) return;
+    document.getElementById("descricao").value = item.descricao;
+    document.getElementById("quantidade").value = item.quantidade;
+    document.getElementById("valor").value = item.valor;
+    removerItem(id);
+}
+
+function atualizarTabela() {
+    const tabela = document.getElementById("listaItens");
+    tabela.innerHTML = "";
+    if (itens.length === 0) {
+        tabela.innerHTML = `<tr><td colspan="5" class="empty">Nenhum item adicionado.</td></tr>`;
+        calcularTotal();
+        return;
+    }
+    itens.forEach(item => {
+        const linha = document.createElement("tr");
+        linha.innerHTML = `
+            <td>${escapeHtml(item.descricao)}</td>
+            <td>${item.quantidade}</td>
+            <td>${moeda(item.valor)}</td>
+            <td>${moeda(item.subtotal)}</td>
+            <td class="no-print item-actions">
+                <button class="btn-warning" onclick="editarItem(${item.id})">Editar</button>
+                <button class="btn-danger" onclick="removerItem(${item.id})">Excluir</button>
+            </td>
+        `;
+        tabela.appendChild(linha);
+    });
+    calcularTotal();
+}
+
+function calcularTotal() {
+    const subtotal = itens.reduce((total, item) => total + item.subtotal, 0);
+    let percentual = Number(document.getElementById("descontoPercentual").value) || 0;
+    let descontoValor = Number(document.getElementById("descontoValor").value) || 0;
+    if (percentual > 100) { percentual = 100; document.getElementById("descontoPercentual").value = 100; }
+    const desconto = (subtotal * percentual) / 100 + descontoValor;
+    const total = Math.max(0, subtotal - desconto);
+
+    document.getElementById("subtotal").textContent = moeda(subtotal);
+    document.getElementById("descontoTotal").textContent = moeda(desconto);
+    document.getElementById("total").textContent = moeda(total);
+}
+
+function coletarDados() {
+    const subtotal = itens.reduce((total, item) => total + item.subtotal, 0);
+    const percentual = Number(document.getElementById("descontoPercentual").value) || 0;
+    const descontoValor = Number(document.getElementById("descontoValor").value) || 0;
+    const desconto = (subtotal * percentual) / 100 + descontoValor;
+    const total = Math.max(0, subtotal - desconto);
+
+    return {
+        numero: document.getElementById("numero").value,
+        data: document.getElementById("data").value,
+        horario: document.getElementById("horarioAgendado").value,
+        status: document.getElementById("status").value,
+        pagamento: document.getElementById("pagamento").value,
+        cliente: document.getElementById("cliente").value.trim(),
+        telefone: document.getElementById("telefone").value.trim(),
+        veiculo: document.getElementById("veiculo").value.trim(),
+        placa: document.getElementById("placa").value.trim().toUpperCase(),
+        ano: document.getElementById("ano").value.trim(),
+        km: document.getElementById("km").value.trim(),
+        motor: document.getElementById("motor").value.trim(),
+        cor: document.getElementById("cor").value.trim(),
+        itens, subtotal, descontoPercentual: percentual, descontoValor, descontoTotal: desconto, total,
+        observacoes: document.getElementById("observacoes").value.trim(),
+        atualizadoEm: new Date().toISOString()
+    };
+}
+
+function salvarOrcamento() {
+    const dados = coletarDados();
+    if (!dados.cliente) return alert("Informe o nome do cliente.");
+    if (!dados.veiculo) return alert("Informe o veículo.");
+    if (!dados.placa) return alert("Informe a placa.");
+    if (itens.length === 0) return alert("Adicione pelo menos um item.");
+
+    let lista = obterOrcamentos();
+    const existente = lista.findIndex(o => o.numero === dados.numero);
+    if (existente >= 0) { lista[existente] = dados; } else { lista.push(dados); }
+    salvarLista(lista);
+    orcamentoAtual = dados;
+    alert(`Orçamento ${dados.numero} salvo com sucesso!`);
+}
+
+function abrirOrcamento(numero) {
+    const lista = obterOrcamentos();
+    const dados = lista.find(o => o.numero === numero);
+    if (!dados) return alert("Orçamento não encontrado.");
+
+    orcamentoAtual = dados;
+    itens = dados.itens || [];
+
+    document.getElementById("numero").value = dados.numero;
+    document.getElementById("data").value = dados.data;
+    document.getElementById("horarioAgendado").value = dados.horario || "08:00";
+    document.getElementById("status").value = dados.status || "Pendente";
+    document.getElementById("pagamento").value = dados.pagamento || "";
+    document.getElementById("cliente").value = dados.cliente || "";
+    document.getElementById("telefone").value = dados.telefone || "";
+    document.getElementById("veiculo").value = dados.veiculo || "";
+    document.getElementById("placa").value = dados.placa || "";
+    document.getElementById("ano").value = dados.ano || "";
+    document.getElementById("km").value = dados.km || "";
+    document.getElementById("motor").value = dados.motor || "";
+    document.getElementById("cor").value = dados.cor || "";
+    document.getElementById("descontoPercentual").value = dados.descontoPercentual || 0;
+    document.getElementById("descontoValor").value = dados.descontoValor || 0;
+    document.getElementById("observacoes").value = dados.observacoes || "";
+
+    atualizarTabela();
+    fecharHistorico();
+    fecharAgenda();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function enviarWhatsApp() {
+    const telefone = document.getElementById("telefone").value.replace(/\D/g, "");
+    const cliente = document.getElementById("cliente").value.trim();
+    const numero = document.getElementById("numero").value;
+    const veiculo = document.getElementById("veiculo").value.trim();
+    const placa = document.getElementById("placa").value.trim().toUpperCase();
+    const total = document.getElementById("total").textContent;
+
+    if (!cliente) return alert("Informe o nome do cliente antes de enviar.");
+    if (itens.length === 0) return alert("Adicione pelo menos um item ao orçamento.");
+    if (!telefone) return alert("Informe o telefone do cliente com DDD.");
+
+    let resumoItens = "";
+    itens.forEach(item => { resumoItens += `• ${item.quantidade}x ${item.descricao} - ${moeda(item.subtotal)}\n`; });
+
+    const mensagem = `Olá, *${cliente}*! 👋\n\nSegue o resumo do orçamento para o seu veículo:\n\n📄 *Orçamento:* #${numero}\n🚗 *Veículo:* ${veiculo} ${placa ? `(${placa})` : ""}\n\n📋 *Itens / Serviços:*\n${resumoItens}\n💰 *Valor Total:* *${total}*\n\nFicamos no aguardo da sua aprovação!`;
+    let numeroCompleto = telefone;
+    if (numeroCompleto.length === 10 || numeroCompleto.length === 11) { numeroCompleto = "55" + numeroCompleto; }
+
+    window.open(`https://api.whatsapp.com/send?phone=${numeroCompleto}&text=${encodeURIComponent(mensagem)}`, "_blank");
+}
+
+function abrirHistorico() { listarOrcamentos(); document.getElementById("modalHistorico").style.display = "block"; }
+function fecharHistorico() { document.getElementById("modalHistorico").style.display = "none"; }
+
+function listarOrcamentos() {
+    const busca = document.getElementById("busca")?.value.toLowerCase() || "";
+    const filtro = document.getElementById("filtroStatus")?.value || "";
+    const lista = obterOrcamentos();
+
+    const filtrados = lista.filter(o => {
+        const texto = `${o.numero} ${o.cliente} ${o.placa} ${o.veiculo}`.toLowerCase();
+        return texto.includes(busca) && (!filtro || o.status === filtro);
+    });
+
+    filtrados.sort((a, b) => new Date(b.atualizadoEm) - new Date(a.atualizadoEm));
+    const tbody = document.getElementById("historico");
+    tbody.innerHTML = "";
+
+    if (filtrados.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="8" class="empty">Nenhum orçamento encontrado.</td></tr>`;
+        return;
+    }
+
+    filtrados.forEach(o => {
+        const tr = document.createElement("tr");
+        const classeStatus = o.status === "Aprovado" ? "status-aprovado" : o.status === "Recusado" ? "status-recusado" : o.status === "Concluído" ? "status-concluido" : "status-pendente";
+        tr.innerHTML = `
+            <td>${escapeHtml(o.numero)}</td>
+            <td>${formatarData(o.data)} ${o.horario ? '(' + o.horario + ')' : ''}</td>
+            <td>${escapeHtml(o.cliente)}</td>
+            <td>${escapeHtml(o.veiculo)}</td>
+            <td>${escapeHtml(o.placa)}</td>
+            <td>${moeda(o.total)}</td>
+            <td><span class="status ${classeStatus}">${escapeHtml(o.status)}</span></td>
+            <td class="item-actions">
+                <button class="btn-primary" onclick="abrirOrcamento('${o.numero}')">Abrir</button>
+                <button class="btn-info" onclick="duplicarOrcamento('${o.numero}')">Duplicar</button>
+                <button class="btn-danger" onclick="excluirOrcamento('${o.numero}')">Excluir</button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+function excluirOrcamento(numero) {
+    if (!confirm(`Deseja excluir o orçamento ${numero}?`)) return;
+    salvarLista(obterOrcamentos().filter(o => o.numero !== numero));
+    listarOrcamentos();
+}
+
+function duplicarOrcamento(numero) {
+    const lista = obterOrcamentos();
+    const original = lista.find(o => o.numero === numero);
+    if (!original) return;
+    const novo = JSON.parse(JSON.stringify(original));
+    novo.numero = gerarNumero();
+    novo.data = hoje();
+    novo.status = "Pendente";
+    novo.atualizadoEm = new Date().toISOString();
+    novo.itens = novo.itens.map(item => ({ ...item, id: Date.now() + Math.random() }));
+    lista.push(novo);
+    salvarLista(lista);
+    abrirOrcamento(novo.numero);
+}
+
+function abrirAgenda() { document.getElementById("modalAgenda").style.display = "block"; renderizarCalendario(); }
+function fecharAgenda() { document.getElementById("modalAgenda").style.display = "none"; }
+function mudarMes(direcao) { dataAgendaAtual.setMonth(dataAgendaAtual.getMonth() + direcao); renderizarCalendario(); }
+
+function renderizarCalendario() {
+    const ano = dataAgendaAtual.getFullYear();
+    const mes = dataAgendaAtual.getMonth();
+    const nomesMeses = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+    document.getElementById("mesAnoAtual").textContent = `${nomesMeses[mes]} de ${ano}`;
+
+    const primeiroDiaMes = new Date(ano, mes, 1);
+    const ultimoDiaMes = new Date(ano, mes + 1, 0);
+    const diasNoMes = ultimoDiaMes.getDate();
+    const diaSemanaInicio = primeiroDiaMes.getDay();
+
+    const aprovados = obterOrcamentos().filter(o => o.status === "Aprovado");
+    const grid = document.getElementById("calendarioGrid");
+    grid.innerHTML = "";
+
+    ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"].forEach(d => {
+        const divHead = document.createElement("div");
+        divHead.className = "calendar-header-day";
+        divHead.textContent = d;
+        grid.appendChild(divHead);
+    });
+
+    const ultimoDiaMesAnterior = new Date(ano, mes, 0).getDate();
+    for (let i = diaSemanaInicio - 1; i >= 0; i--) {
+        const div = document.createElement("div");
+        div.className = "calendar-day other-month";
+        div.textContent = ultimoDiaMesAnterior - i;
+        grid.appendChild(div);
+    }
+
+    for (let dia = 1; dia <= diasNoMes; dia++) {
+        const dataIso = `${ano}-${String(mes + 1).padStart(2, "0")}-${String(dia).padStart(2, "0")}`;
+        const div = document.createElement("div");
+        div.className = "calendar-day";
+        const orcamentosDoDia = aprovados.filter(o => o.data === dataIso);
+        if (orcamentosDoDia.length > 0) div.classList.add("has-approved");
+        if (diaSelecionadoAgenda === dataIso) div.classList.add("selected");
+
+        div.innerHTML = `<span>${dia}</span>`;
+        if (orcamentosDoDia.length > 0) {
+            const badge = document.createElement("div");
+            badge.className = "badge-aprovado-count";
+            badge.textContent = `${orcamentosDoDia.length} serv.`;
+            div.appendChild(badge);
+        }
+        div.onclick = () => selecionarDiaAgenda(dataIso, orcamentosDoDia);
+        grid.appendChild(div);
+    }
+
+    const totalCelulas = diaSemanaInicio + diasNoMes;
+    const restantes = totalCelulas % 7 === 0 ? 0 : 7 - (totalCelulas % 7);
+    for (let i = 1; i <= restantes; i++) {
+        const div = document.createElement("div");
+        div.className = "calendar-day other-month";
+        div.textContent = i;
+        grid.appendChild(div);
+    }
+}
+
+function selecionarDiaAgenda(dataIso, listaOrcamentosDia) {
+    diaSelecionadoAgenda = dataIso;
+    renderizarCalendario();
+    document.getElementById("dataSelecionadaTexto").textContent = formatarData(dataIso);
+    const tbody = document.getElementById("listaAgendaDia");
+    tbody.innerHTML = "";
+
+    if (!listaOrcamentosDia || listaOrcamentosDia.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" class="empty">Nenhum serviço aprovado nesta data.</td></tr>`;
+        return;
+    }
+
+    // Ordenar por horário
+    listaOrcamentosDia.sort((a, b) => (a.horario || "08:00").localeCompare(b.horario || "08:00"));
+
+    listaOrcamentosDia.forEach(o => {
+        const horaInicio = o.horario || "08:00";
+        // Calcular hora de término (2 horas depois)
+        const partesHora = horaInicio.split(":");
+        let hNum = Number(partesHora[0]) + 2;
+        let horaFim = String(hNum).padStart(2, "0") + ":" + partesHora[1];
+
+        const dataGoogle = o.data.replace(/-/g, "");
+        const horaGoogleInicio = partesHora.join("") + "00";
+        const horaGoogleFim = String(hNum).padStart(2, "0") + partesHora[1] + "00";
+
+        const tituloEvento = encodeURIComponent(`Oficina (2h): ${o.veiculo} (${o.placa || 'Sem Placa'}) - ${o.cliente}`);
+        const descricaoEvento = encodeURIComponent(`Orçamento: #${o.numero}\nHorário: ${horaInicio} às ${horaFim}\nCliente: ${o.cliente}\nTelefone: ${o.telefone}\nVeículo: ${o.veiculo} - Placa: ${o.placa}\nValor Total: ${moeda(o.total)}\n\nServiços:\n` + (o.itens || []).map(i => `- ${i.quantidade}x ${i.descricao}`).join("\n"));
+        const urlGoogleCalendar = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${tituloEvento}&dates=${dataGoogle}T${horaGoogleInicio}/${dataGoogle}T${horaGoogleFim}&details=${descricaoEvento}`;
+
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+            <td><strong>${horaInicio} às ${horaFim}</strong></td>
+            <td>${escapeHtml(o.numero)}</td>
+            <td>${escapeHtml(o.cliente)}</td>
+            <td>${escapeHtml(o.veiculo)}</td>
+            <td>${escapeHtml(o.placa)}</td>
+            <td>${moeda(o.total)}</td>
+            <td class="item-actions">
+                <button class="btn-primary" onclick="abrirOrcamento('${o.numero}')">Abrir</button>
+                <a href="${urlGoogleCalendar}" target="_blank" class="btn-success" style="text-decoration: none; padding: 6px 9px; font-size: 12px; display: inline-block; border-radius: 6px; font-weight: bold; color: white;">🗓️ Add Google Agenda</a>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+function imprimirOrcamento() {
+    if (itens.length === 0) return alert("Adicione itens antes de imprimir.");
+    document.title = `Orçamento_${document.getElementById("numero").value}`;
+    window.print();
+}
+
+function abrirConfiguracoes() {
+    const config = obterConfiguracoes();
+    document.getElementById("oficinaNome").value = config.nome || "Oficina Mecânica";
+    document.getElementById("oficinaTelefone").value = config.telefone || "";
+    document.getElementById("oficinaCnpj").value = config.cnpj || "";
+    document.getElementById("oficinaEmail").value = config.email || "";
+    document.getElementById("oficinaEndereco").value = config.endereco || "";
+    document.getElementById("oficinaNovoUsuario").value = obterUsuarioSalvo();
+    document.getElementById("oficinaNovaSenha").value = "";
+    document.getElementById("modalConfig").style.display = "block";
+}
+
+function fecharConfiguracoes() { document.getElementById("modalConfig").style.display = "none"; }
+
+function salvarConfiguracoes() {
+    const config = {
+        nome: document.getElementById("oficinaNome").value.trim(),
+        telefone: document.getElementById("oficinaTelefone").value.trim(),
+        cnpj: document.getElementById("oficinaCnpj").value.trim(),
+        email: document.getElementById("oficinaEmail").value.trim(),
+        endereco: document.getElementById("oficinaEndereco").value.trim()
+    };
+    if (document.getElementById("oficinaNovoUsuario").value.trim()) localStorage.setItem(CHAVE_USUARIO, document.getElementById("oficinaNovoUsuario").value.trim());
+    if (document.getElementById("oficinaNovaSenha").value.trim()) localStorage.setItem(CHAVE_SENHA, document.getElementById("oficinaNovaSenha").value.trim());
+
+    localStorage.setItem(CHAVE_CONFIG, JSON.stringify(config));
+    document.getElementById("tituloSistema").textContent = config.nome || "Oficina Mecânica";
+    fecharConfiguracoes();
+    alert("Configurações salvas com sucesso!");
+}
+</script>
+</body>
+</html>
